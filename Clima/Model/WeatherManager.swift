@@ -1,0 +1,78 @@
+  //
+  //  WeatherManager.swift
+  //  Clima
+  //
+  //  Created by Lucas Couto on 14/08/23.
+  //  Copyright © 2023 App Brewery. All rights reserved.
+  //
+
+import Foundation
+import CoreLocation
+
+protocol WeatherManagerDelegate{
+  func didUpdateWeather(_ weatherManager: WeatherManager, weather: WeatherModel)
+  func didFailWithError(error: Error)
+}
+
+struct WeatherManager{
+  let weatherURL = "https://api.openweathermap.org/data/2.5/weather?units=metric&appid=e7c8f6ee2f9036df67fb4af3d977f762"
+  
+  var delegate: WeatherManagerDelegate?
+  
+  func fecthWeather(cityName: String){
+    let urlString = "\(weatherURL)&q=\(cityName)"
+    performRequest(with: urlString)
+  }
+  
+  func fetchWeatherByCoords(lat: CLLocationDegrees, long: CLLocationDegrees){
+    let urlString = "\(weatherURL)&lat=\(lat)&lon=\(long)"
+    performRequest(with: urlString)
+  }
+  
+  func performRequest(with urlString: String) {
+      // 1. Create URL
+    if let url = URL(string: urlString){
+      
+        // 2. Create a URLSession
+      let session = URLSession(configuration: .default)
+      
+        // 3. Give the session a task
+      let task = session.dataTask(with: url) { data, response, error in
+        if error != nil {
+          delegate?.didFailWithError(error: error!)
+          return
+        }
+        
+        if let safeData = data {
+          if let weather = parseJSON(safeData){
+            delegate?.didUpdateWeather(self, weather: weather)
+          }
+        }
+      }
+      
+        // 4. Start the task
+      task.resume()
+      
+    }
+  }
+  
+  func parseJSON(_ weatherData: Data) -> WeatherModel? {
+    let decoder = JSONDecoder()
+    do{
+      let decodedData = try decoder.decode(WeatherData.self, from: weatherData)
+      let id = decodedData.weather[0].id
+      let name = decodedData.name
+      let temp = decodedData.main.temp
+      
+      let weather = WeatherModel(conditionId: id, cityName: name, temperature: temp)
+      return weather
+      
+    } catch {
+      print(error)
+      delegate?.didFailWithError(error: error)
+      return nil
+    }
+    
+  }
+  
+}
